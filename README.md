@@ -6,7 +6,7 @@
 
 ## 📱 直接安装测试
 
-1. 在本页 **Releases**（右侧栏）下载 `audit-os-v0.2.apk`
+1. **直接下载 APK**：https://github.com/Ya-MiC/audit-os-mobile/raw/main/dist/audit-os-v0.2.apk （Releases 页的 Source code 是源码压缩包，APK 固定在 dist/ 目录）
 2. 传到手机（微信文件传输助手/QQ/数据线均可），点开安装
 3. 系统提示"未知来源"时允许一次即可（自签名 APK，未上架商店的正常提示）
 4. 打开「审计OS」→ 点 **▶ 载入示例账套并分析** → 看风险报告
