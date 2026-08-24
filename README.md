@@ -1,4 +1,4 @@
-# 晏铭湛箴 Audit OS — 移动端（APK）
+# 湛箴 — 移动端（APK）
 
 > 中小企业智能审计 · 手机版骨架 v0.2
 > 战略上游：[Ya-MiC/action-tree](https://github.com/Ya-MiC/action-tree) 总纲 §26/§34
@@ -6,7 +6,7 @@
 
 ## 📱 直接安装测试
 
-1. **直接下载 APK**：https://github.com/Ya-MiC/audit-os-mobile/raw/main/dist/audit-os-v0.2.apk （Releases 页的 Source code 是源码压缩包，APK 固定在 dist/ 目录）
+1. **直接下载 APK**：https://github.com/Ya-MiC/audit-os-mobile/raw/main/dist/zhanzhen-v0.3.apk
 2. 传到手机（微信文件传输助手/QQ/数据线均可），点开安装
 3. 系统提示"未知来源"时允许一次即可（自签名 APK，未上架商店的正常提示）
 4. 打开「审计OS」→ 点 **▶ 载入示例账套并分析** → 看风险报告
