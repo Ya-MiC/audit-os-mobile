@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>晏铭湛箴 Audit OS</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <div class="brand">审计 OS <span class="ver" id="ver"></span></div>
+  <div class="sub">中小企业智能审计 · MVP 骨架 v0.2</div>
+</header>
+
+<main id="view-home">
+  <section class="card hero">
+    <h1>上传财务数据 → 风险报告</h1>
+    <p class="dim">规则引擎本地运行 · 数据不出手机 · 每条结论带证据哈希链</p>
+    <div class="btns">
+      <button class="btn primary big" id="btnDemo">▶ 载入示例账套并分析</button>
+      <label class="btn big ghost" for="fileIn">📂 导入 CSV 账套</label>
+      <input type="file" id="fileIn" accept=".csv,text/csv" hidden>
+    </div>
+    <details class="fmt"><summary>CSV 格式说明</summary>
+      <pre>凭证号,日期,科目,借方金额,贷方金额,对方单位,摘要
+记-0001,2025-03-05,主营业务收入,,260000.00,华洋商贸,赊销
+记-0001,2025-03-05,应收账款,293800.00,,,华洋商贸</pre>
+      科目名自动映射标准科目；金额千分位可识别。
+    </details>
+  </section>
+
+  <section class="card" id="qualityCard" style="display:none">
+    <h2>① 数据质量检查</h2>
+    <div id="qualityList"></div>
+  </section>
+
+  <section class="card" id="resultCard" style="display:none">
+    <h2>② 风险事件 <span class="badge" id="riskCount"></span></h2>
+    <div class="filters" id="filters"></div>
+    <div id="riskList"></div>
+  </section>
+
+  <section class="card" id="traceCard" style="display:none">
+    <h2>③ 结论追溯</h2>
+    <div id="traceBody" class="mono"></div>
+  </section>
+</main>
+
+<footer>
+  <span id="footStatus">就绪</span>
+  <span class="right" id="hashStatus"></span>
+</footer>
+
+<script src="sha256.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

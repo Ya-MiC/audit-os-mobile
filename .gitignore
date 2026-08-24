@@ -1,0 +1,4 @@
+__pycache__/
+build/
+*.apk.idsig
+.DS_Store
