@@ -2,56 +2,103 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>晏铭湛箴 Audit OS</title>
-<link rel="stylesheet" href="app.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>湛箴采集端</title>
+<script src="file:///android_asset/sha256.js"></script>
+<style>
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f2ea;color:#222;margin:0;padding-bottom:80px}
+header{background:#b03a2e;color:#fff;padding:16px;display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0}
+header .mascot{font-size:22px}
+main{padding:14px}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(60,40,20,.12)}
+.shoot{display:block;width:100%;padding:20px;border:0;border-radius:14px;background:#c9a063;color:#3a2a10;font-size:17px;font-weight:700}
+.queue-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}
+.thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#eee}
+.meta{flex:1}.meta .sha{font-size:10px;color:#999;font-family:monospace}
+.del{border:0;background:#fee;color:#b03a2e;border-radius:6px;padding:4px 8px}
+.export{position:fixed;bottom:0;left:0;right:0;padding:12px 14px;background:#fff;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+.export button{width:100%;padding:15px;border:0;border-radius:12px;background:#b03a2e;color:#fff;font-size:16px;font-weight:700}
+.empty{text-align:center;color:#998;padding:30px 0;font-size:14px}
+.note{font-size:11px;color:#887;margin-top:6px}
+</style>
 </head>
 <body>
-<header>
-  <div class="brand">审计 OS <span class="ver" id="ver"></span></div>
-  <div class="sub">中小企业智能审计 · MVP 骨架 v0.2</div>
-</header>
-
-<main id="view-home">
-  <section class="card hero">
-    <h1>上传财务数据 → 风险报告</h1>
-    <p class="dim">规则引擎本地运行 · 数据不出手机 · 每条结论带证据哈希链</p>
-    <div class="btns">
-      <button class="btn primary big" id="btnDemo">▶ 载入示例账套并分析</button>
-      <label class="btn big ghost" for="fileIn">📂 导入 CSV 账套</label>
-      <input type="file" id="fileIn" accept=".csv,text/csv" hidden>
-    </div>
-    <details class="fmt"><summary>CSV 格式说明</summary>
-      <pre>凭证号,日期,科目,借方金额,贷方金额,对方单位,摘要
-记-0001,2025-03-05,主营业务收入,,260000.00,华洋商贸,赊销
-记-0001,2025-03-05,应收账款,293800.00,,,华洋商贸</pre>
-      科目名自动映射标准科目；金额千分位可识别。
-    </details>
-  </section>
-
-  <section class="card" id="qualityCard" style="display:none">
-    <h2>① 数据质量检查</h2>
-    <div id="qualityList"></div>
-  </section>
-
-  <section class="card" id="resultCard" style="display:none">
-    <h2>② 风险事件 <span class="badge" id="riskCount"></span></h2>
-    <div class="filters" id="filters"></div>
-    <div id="riskList"></div>
-  </section>
-
-  <section class="card" id="traceCard" style="display:none">
-    <h2>③ 结论追溯</h2>
-    <div id="traceBody" class="mono"></div>
-  </section>
+<header><span class="mascot">🐙</span><h1>湛箴 · 采集端</h1></header>
+<main>
+<div class="card">
+  <button class="shoot" onclick="shoot()">📷 拍摄凭证</button>
+  <input type="file" id="album" accept="image/*" multiple style="display:none" onchange="fromAlbum(this)">
+  <button onclick="document.getElementById('album').click()"
+    style="width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#f0e6d2;color:#5a4a28;font-size:14px">从相册选择</button>
+  <p class="note">每张照片本地计算 SHA-256 后入队；原始照片保留到工作台确认收妥。全程离线。</p>
+</div>
+<div class="card">
+  <b>采集队列</b>（<span id="count">0</span> 张）
+  <div id="queue"></div>
+</div>
 </main>
+<div class="export"><button onclick="exportPack()">📦 导出采集包 → 工作台</button></div>
+<script>
+let queue=[];
+try{queue=JSON.parse(localStorage.getItem('zz_queue')||'[]')}catch(e){queue=[]}
 
-<footer>
-  <span id="footStatus">就绪</span>
-  <span class="right" id="hashStatus"></span>
-</footer>
+function save(){localStorage.setItem('zz_queue',JSON.stringify(queue));render()}
 
-<script src="sha256.js"></script>
-<script src="app.js"></script>
+async function addPhoto(file){
+  const buf=await file.arrayBuffer();
+  const sha=await sha256Hex(buf);
+  const reader=new FileReader();
+  reader.onload=()=>{
+    queue.push({id:crypto.randomUUID(),filename:'photo-'+Date.now()+'.jpg',
+      sha256:sha,captured_at:new Date().toISOString(),note:'',
+      dataUrl:reader.result});
+    save();
+  };
+  reader.readAsDataURL(file);
+}
+
+function shoot(){
+  // WebView 版：走相册（Android 壳里 MainActivity 会拦截 zhanzhen://camera 走 Camera Intent）
+  if(location.protocol==='file:' && /Android/.test(navigator.userAgent)
+     && window.ZhanZhenBridge && window.ZhanZhenBridge.openCamera){
+    window.ZhanZhenBridge.openCamera(); return;
+  }
+  document.getElementById('album').capture='environment';
+  document.getElementById('album').click();
+}
+
+function fromAlbum(input){for(const f of input.files)addPhoto(f);input.value=''}
+
+function render(){
+  document.getElementById('count').textContent=queue.length;
+  const q=document.getElementById('queue');
+  if(!queue.length){q.innerHTML='<div class="empty">队列空——拍第一张凭证吧</div>';return}
+  q.innerHTML=queue.map(it=>`
+    <div class="queue-item">
+      <img class="thumb" src="${it.dataUrl}">
+      <div class="meta">
+        <div>${new Date(it.captured_at).toLocaleString()}</div>
+        <div class="sha">${it.sha256.slice(0,16)}…</div>
+      </div>
+      <button class="del" onclick="rm('${it.id}')">删</button>
+    </div>`).join('');
+}
+
+function rm(id){queue=queue.filter(x=>x.id!==id);save()}
+
+function exportPack(){
+  if(!queue.length)return alert('队列是空的');
+  const pack={app:'zhanzhen-capture',version:'0.4',exported_at:new Date().toISOString(),
+    items:queue.map(({id,dataUrl,...rest})=>({...rest,
+      content_b64:(dataUrl.split(',')[1]||'')}))};
+  const blob=new Blob([JSON.stringify(pack)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='zhanzhen-capture-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+render();
+</script>
 </body>
 </html>
