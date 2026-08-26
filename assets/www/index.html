@@ -40,7 +40,7 @@ main{padding:14px}
   <input type="file" id="album" accept="image/*" multiple style="display:none" onchange="fromAlbum(this)">
   <button onclick="document.getElementById('album').click()"
     style="width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#f0e6d2;color:#5a4a28;font-size:14px">从相册选择</button>
-  <p class="note">每张照片本地计算 SHA-256 后入队；原始照片保留到工作台确认收妥。拍照与队列默认离线，仅在你点「☁️直接上传」时才联网。</p>
+  <p class="note">照片本地存队（含SHA-256）。文字识别在<b>电脑工作台/服务器</b>完成：点「☁️直接上传」或「导出采集包」拷到电脑。</p><p class="note" style="color:#b03a2e">⚠ 拍照后若工作台提示图片无法识别，是服务器还没装 PaddleOCR（pip install zhanzhen[ocr]）——装好后重新点识别即可。</p>
 </div>
 <div class="card">
   <b>采集队列</b>（<span id="count">0</span> 张）
