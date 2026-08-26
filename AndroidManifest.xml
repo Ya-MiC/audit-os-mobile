@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.yanming.auditos"
-    android:versionCode="2"
-    android:versionName="0.2">
+    android:versionCode="5"
+    android:versionName="0.5">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34"/>
+
+    <!-- v0.5：联网直传（用户在设置里填好服务器地址后、点「☁️直接上传」才出网；
+         平时拍照/队列/导出仍全程离线） -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity android:name=".MainActivity" android:exported="true">

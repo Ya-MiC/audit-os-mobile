@@ -6,7 +6,7 @@
 <title>湛箴采集端</title>
 <script src="file:///android_asset/sha256.js"></script>
 <style>
-body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f2ea;color:#222;margin:0;padding-bottom:80px}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f2ea;color:#222;margin:0;padding-bottom:130px}
 header{background:#b03a2e;color:#fff;padding:16px;display:flex;align-items:center;gap:10px}
 header h1{font-size:18px;margin:0}
 header .mascot{font-size:22px}
@@ -18,9 +18,18 @@ main{padding:14px}
 .meta{flex:1}.meta .sha{font-size:10px;color:#999;font-family:monospace}
 .del{border:0;background:#fee;color:#b03a2e;border-radius:6px;padding:4px 8px}
 .export{position:fixed;bottom:0;left:0;right:0;padding:12px 14px;background:#fff;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
-.export button{width:100%;padding:15px;border:0;border-radius:12px;background:#b03a2e;color:#fff;font-size:16px;font-weight:700}
+.export .row{display:flex;gap:8px}
+.export button{flex:1;padding:15px 6px;border:0;border-radius:12px;font-size:14px;font-weight:700}
+.export .off{background:#b03a2e;color:#fff}
+.export .on{background:#2f7d5c;color:#fff}
+.export button:disabled{opacity:.55}
 .empty{text-align:center;color:#998;padding:30px 0;font-size:14px}
 .note{font-size:11px;color:#887;margin-top:6px}
+.set label{display:block;font-size:12px;color:#665;margin-top:8px}
+.set input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd8cc;border-radius:10px;font-size:14px;margin-top:3px;background:#fbf9f4}
+.up-ok{font-size:11px;color:#2f7d5c;font-family:monospace;margin-top:2px}
+#uploadResult{margin-top:8px;font-size:13px;line-height:1.5;word-break:break-all}
+.muted{color:#998}
 </style>
 </head>
 <body>
@@ -31,14 +40,26 @@ main{padding:14px}
   <input type="file" id="album" accept="image/*" multiple style="display:none" onchange="fromAlbum(this)">
   <button onclick="document.getElementById('album').click()"
     style="width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#f0e6d2;color:#5a4a28;font-size:14px">从相册选择</button>
-  <p class="note">每张照片本地计算 SHA-256 后入队；原始照片保留到工作台确认收妥。全程离线。</p>
+  <p class="note">每张照片本地计算 SHA-256 后入队；原始照片保留到工作台确认收妥。拍照与队列默认离线，仅在你点「☁️直接上传」时才联网。</p>
 </div>
 <div class="card">
   <b>采集队列</b>（<span id="count">0</span> 张）
   <div id="queue"></div>
 </div>
+<div class="card set" id="settings">
+  <b>⚙️ 服务器设置</b>
+  <label>工作台地址（如 http://192.168.1.10:8000）</label>
+  <input type="url" id="srvUrl" placeholder="https://你的湛箴工作台地址" autocomplete="off">
+  <label>API Key（多用户模式必填；单机模式可留空）</label>
+  <input type="password" id="apiKey" placeholder="ZZ_USERS 里配置的 Key" autocomplete="off">
+  <p class="note">两项只保存在本机 App 的 localStorage，不上传、不入包；随每次上传附于 X-API-Key 头。留空设置即回到纯离线模式。</p>
+</div>
+<div id="uploadResult"></div>
 </main>
-<div class="export"><button onclick="exportPack()">📦 导出采集包 → 工作台</button></div>
+<div class="export"><div class="row">
+  <button class="off" onclick="exportPack()">📦 导出采集包</button>
+  <button class="on" id="btnUpload" onclick="uploadPack()">☁️ 直接上传到工作台</button>
+</div></div>
 <script>
 let queue=[];
 try{queue=JSON.parse(localStorage.getItem('zz_queue')||'[]')}catch(e){queue=[]}
@@ -87,17 +108,78 @@ function render(){
 
 function rm(id){queue=queue.filter(x=>x.id!==id);save()}
 
-function exportPack(){
-  if(!queue.length)return alert('队列是空的');
-  const pack={app:'zhanzhen-capture',version:'0.4',exported_at:new Date().toISOString(),
+/* ---- v0.5 双轨出口：离线导出 与 联网直传 共用同一采集包结构 ---- */
+function currentPack(){
+  return {app:'zhanzhen-capture',version:'0.5',exported_at:new Date().toISOString(),
     items:queue.map(({id,dataUrl,...rest})=>({...rest,
       content_b64:(dataUrl.split(',')[1]||'')}))};
-  const blob=new Blob([JSON.stringify(pack)],{type:'application/json'});
+}
+
+function exportPack(){
+  if(!queue.length)return alert('队列是空的');
+  const blob=new Blob([JSON.stringify(currentPack())],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='zhanzhen-capture-'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
 }
+
+/* ---- 云端直传：调壳 Bridge.uploadPack → POST {base}/v1/vouchers/capture-batch ---- */
+let uploading=false;
+function setUploadBusy(b){
+  uploading=b;
+  const btn=document.getElementById('btnUpload');
+  btn.disabled=b;
+  btn.textContent=b?'☁️ 上传中…':'☁️ 直接上传到工作台';
+}
+
+window.__zzUploadDone=function(resp){
+  setUploadBusy(false);
+  const out=document.getElementById('uploadResult');
+  if(resp&&typeof resp.ingested==='number'){
+    const rows=(resp.vouchers||[]).map(v=>
+      `<div class="up-ok">✅ ${v.voucher_id}</div>`).join('');
+    out.innerHTML=`<b>✅ 已入账 ${resp.ingested} 张凭证</b>${rows}
+      <p class="note">服务端已重算 SHA-256 核验完整性；请到工作台「凭证列表」复核并确认收妥。</p>`;
+  }else{
+    const code=(resp&&resp.code)||'error';
+    const msg=(resp&&resp.message)||'未知错误';
+    out.innerHTML=`<b>❌ 上传失败</b>（<span class="sha">${code}</span>）：<br>${msg}`
+      +(code==='unauthorized'||code==='config_missing'
+        ?'<p class="note">请检查上方「服务器设置」：地址是否可达、API Key 是否正确。</p>':'');
+  }
+};
+
+function uploadPack(){
+  if(uploading)return;
+  if(!queue.length)return alert('队列是空的');
+  const base=(localStorage.getItem('zz_server_url')||'').trim();
+  const key =(localStorage.getItem('zz_api_key')||'').trim();
+  if(!base){alert('请先在「服务器设置」里填写工作台地址');return}
+  if(!(window.ZhanZhenBridge&&window.ZhanZhenBridge.uploadPack)){
+    document.getElementById('uploadResult').innerHTML=
+      '<b>❌ 当前不在安卓壳内</b>：直连上传需要在湛箴 App 中使用；此处可改用「📦 导出采集包」。';
+    return;
+  }
+  setUploadBusy(true);
+  document.getElementById('uploadResult').innerHTML=
+    '<span class="muted">⏳ 正在上传（照片较多时可能需要一两分钟，请保持网络畅通）…</span>';
+  try{
+    window.ZhanZhenBridge.uploadPack(base,key,JSON.stringify(currentPack()));
+  }catch(e){
+    window.__zzUploadDone({code:'bridge_error',message:String((e&&e.message)||e)});
+  }
+}
+
+/* ---- 设置持久化（只存本机 localStorage） ---- */
+(function initSettings(){
+  const su=document.getElementById('srvUrl'),sk=document.getElementById('apiKey');
+  su.value=localStorage.getItem('zz_server_url')||'';
+  sk.value=localStorage.getItem('zz_api_key')||'';
+  su.addEventListener('input',()=>localStorage.setItem('zz_server_url',su.value.trim()));
+  sk.addEventListener('input',()=>localStorage.setItem('zz_api_key',sk.value.trim()));
+})();
+
 render();
 </script>
 </body>
