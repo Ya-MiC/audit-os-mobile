@@ -1,0 +1,72 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["assets/**", "java/**", "res/**", "AndroidManifest.xml"]
+  workflow_dispatch: {}
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "17"}
+
+      - name: Install Android build-tools
+        run: |
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            "build-tools;34.0.0" "platforms;android-34" >/dev/null
+          echo "BT=${ANDROID_HOME}/build-tools/34.0.0" >> $GITHUB_ENV
+          echo "PLAT=${ANDROID_HOME}/platforms/android-34/android.jar" >> $GITHUB_ENV
+
+      - name: Compile resources + java + dex + package (aapt2/d8)
+        run: |
+          mkdir -p build/classes build/gen
+          "$BT/aapt2" compile --dir res -o build/res.zip
+          "$BT/aapt2" link -o build/base.apk -I "$PLAT" --manifest AndroidManifest.xml \
+            -R build/res.zip --java build/gen --auto-add-overlay
+          javac --release 11 -classpath "$PLAT" -d build/classes \
+            java/com/yanming/auditos/MainActivity.java \
+            build/gen/com/yanming/auditos/R.java
+          "$BT/d8" --release --lib "$PLAT" --min-api 24 --output build \
+            $(find build/classes -name '*.class')
+          python3 - <<'PY'
+          import zipfile, os
+          with zipfile.ZipFile("build/base.apk","a") as z:
+              z.write("build/classes.dex","classes.dex")
+              for root,_,fs in os.walk("assets"):
+                  for f in fs:
+                      p=os.path.join(root,f); z.write(p,os.path.relpath(p,"."))
+          PY
+
+      - name: Align + sign
+        run: |
+          "$BT/zipalign" -f 4 build/base.apk build/aligned.apk
+          if [ ! -f dist/zhanzhen-signing.keystore ]; then
+            keytool -genkeypair -keystore ks.keystore -storepass auditos -keypass auditos \
+              -alias auditos -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=ZhanZhen,O=Ya-MiC,C=CN"
+            KS="ks.keystore"
+          else
+            KS="dist/zhanzhen-signing.keystore"
+          fi
+          "$BT/apksigner" sign --ks "$KS" --ks-pass pass:auditos --key-pass pass:auditos \
+            --out zhanzhen-v0.5.apk build/aligned.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zhanzhen-apk
+          path: zhanzhen-v0.5.apk
+
+      - name: Attach to v0.5 release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.5
+          files: zhanzhen-v0.5.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
